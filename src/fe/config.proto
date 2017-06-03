@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+message ConfigFile {
+  map<string, uint32> domains = 1;
+  uint32 port = 2;
+  string db = 3;
+}
