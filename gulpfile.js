@@ -1,4 +1,5 @@
 const gulp = require('gulp');
+const sourcemaps = require('gulp-sourcemaps');
 const ts = require('gulp-typescript');
 const {spawn} = require('child_process');
 const through = require('through2');
@@ -22,13 +23,19 @@ gulp.task('pb', () => gulp
           .pipe(gulp.dest('build/')));
 gulp.task('ts', ['copy', 'pb'], () => gulp
           .src(['build/**/*.ts', '!build/**/*.d.ts'])
+          .pipe(sourcemaps.init())
           .pipe(ts({
             noImplicitAny: true,
+            noImplicitThis: true,
+            strictNullChecks: true,
+            //inlineSourceMap: true,
+            //inlineSources: true,
             //experimentalDecorators: true,
             //emitDecoratorMetadata: true,
             lib: ['ES2015'],
             //target: 'ES2015',
           }))
+          .pipe(sourcemaps.write())
           .pipe(gulp.dest('build/')));
 gulp.task('default', ['ts'], () => gulp
           .src('build/**/*.js')
