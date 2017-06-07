@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-message ClientKeys {
-  string public_key = 1;
-  // 
-  string signing_key = 2;
-}

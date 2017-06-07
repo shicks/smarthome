@@ -13,7 +13,12 @@ require('source-map-support').install();
 //   - userid, serviceid (1:1 map w/ subdomains?? - if not, subservice/role/expiry?)
 //   - could have admin web interface for adjusting roles/expirations/schedules?
 
+import * as express from 'express';
+import * as request from 'request';
+const letsencrypt: any = require('letsencrypt-express');
+const redirect: any = require('redirect-https'); /// <reference path="./imports.d.ts" />
 import * as http from 'http';
+import * as https from 'https';
 import {readFile} from 'fs';
 import {parse as parseUrl, Url} from 'url';
 
@@ -62,80 +67,66 @@ hello.listen(8000);
   //   (server.address().port)
   // We could also take a lazy approach, only starting servers
   //   when needed. - may want a sort of /statusz in that case?
-  const handler = (req: http.IncomingMessage, res: http.ServerResponse) => { 
+
+  const domains: {[domain: string]: number} = {};
+  for (const server of config.servers) {
+    console.dir(server);
+    for (const domain of server.domains || []) {
+      if (server.fixedPort) domains[domain] = server.fixedPort;
+    }
+  }
+  console.dir(domains);
+
+
+  const app = express();
+  //app.listen(config.port);
+
+  function approveDomains(opts: any, certs: any, cb: any) {
+    console.error('approveDomains');
+    console.dir({opts: opts, certs: certs});
+    if (certs) {
+      opts.domains = certs.altnames;
+    } else {
+      opts.email = 'stephenhicks@gmail.com';
+      opts.agreeTos = true;
+    }
+    cb(null, {options: opts, certs: certs});
+  }
+
+  const lex = letsencrypt.create({
+    approveDomains,
+    domains: ['videos.brieandsteve.com', 'ssh.brieandsteve.com',
+              'git.sdhicks.net', 'ssh.sdhicks.net', 'www.sdhicks.net'],
+    server: 'staging',
+  });
+
+  http.createServer(lex.middleware(redirect())).listen(80, function(this: any) {
+    console.log("Listening for ACME http-01 challenges on", this.address());
+  })
+
+  app.all('/*', function(req, res) {
     const url: Url = parseUrl(req.url || '');
-    const domain = config.domains[url.hostname || req.headers['host'] || ''];
+    const domain = domains[url.host || req.headers['host'] || ''];
+    console.error('HANDLING REQUEST: ' + url);
     if (!domain) {
-      res.writeHead(404, 'Not Found');
-      res.end('Not Found: ' + (() => {
-        const a = [''];
-        for (const k of Object.keys(req)) {
-          try {
-            a.push('  ' + k + ': ' + (req as any)[k]);
-          } catch (e) {
-            a.push('  ' + k + ': [???]');
-          }
-        }
-        a.push('\nHeaders:');
-        for (const k of Object.keys(req.headers)) {
-          a.push('  ' + k + ': ' + req.headers[k]);
-        }
-        return a.join('\n');
-          })());
+      res.status(404).send('Not Found: url.host=' + url.host + ', host header=' + req.headers['host']);
       return;
     }
     const opts = {
+      url: 'http://localhost:' + domain + req.url,
+      qs: req.query,
       method: req.method,
       headers: req.headers,
-      path: url.path,
-      port: domain,
+      //port: domain,
     };
-
-    function once(s: Serializer, f: (cb: () => void) => void): () => void {
-      return () => {
-        s.run(f);
-        f = () => {};
-      };
-    }
-    const outgoing: http.ClientRequest = http.request(opts);
-    // TODO(sdh): DefinitelyTyped seems to be missing this method?
-    (outgoing as any).flushHeaders();
-    const reqSerializer = new Serializer();
-    const resSerializer = new Serializer();
-    const endOut = once(reqSerializer, (cb) => outgoing.end(cb));
-    //if (req.method == 'GET') endOut();
-    const abortOut = once(reqSerializer, (cb) => (outgoing.abort(), cb()));
-    req.on('data', (data) => {
-      reqSerializer.run((cb) => outgoing.write(data.toString(), cb));
-    });
-    req.on('end', endOut);
-    req.on('error', abortOut);
-    req.on('close', endOut);
-    req.on('aborted', abortOut);
-    outgoing.on('error', () => req.destroy());
-    outgoing.on('continue',
-                () => resSerializer.runSync(() => res.writeContinue()));
-    outgoing.on('response', (out: http.IncomingMessage) => {
-      //console.dir(out);
-      const endRes = once(resSerializer, (cb) => res.end(cb));
-      const endOut = once(resSerializer, (cb) => (out.destroy(), cb()));
-      res.writeHead(out.statusCode || 200, out.statusMessage, out.headers);
-      out.on('end', endRes);
-      out.on('error', endRes); // no abort?!?
-      out.on('close', endRes);
-      out.on('aborted', endRes);
-      //out.on('close', logging('out resp close', endRes));
-      res.on('close', once(resSerializer, (cb) => (out.destroy(), cb())));
-      out.on('data', (data) => {
-        resSerializer.run(cb => res.write(data.toString(), cb));
-      });
-      //if (req.method == 'GET') endRes();
-    });
-  };
-  const server = http.createServer(handler);
-  server.on('error', (err) => {
-    // TODO - consider something different?
-    console.error(err);
+    req.pipe(request(opts, (error, response, body) => {
+      if (!error) return;
+      if (error.code == 'ECONNREFUSED') console.error('Refused connection');
+      else throw error;
+    })).pipe(res);
   });
-  server.listen(config.port || 80);
+
+  https.createServer(lex.httpsOptions, lex.middleware(app)).listen(443, function(this: any) {
+    console.log("Listening for ACME tls-sni-01 challenges and serve app on", this.address());
+  });
 })();
