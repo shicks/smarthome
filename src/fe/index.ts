@@ -1,10 +1,23 @@
 require('source-map-support').install();
 
+// TODO - provide common libraries for crypto/auth
+//   Is it a problem for multiple procs to have write access to sqlite3 at once?
+//   - doesn't seem to be - there's transactions if needed, and even just
+//     append-only should be fine since order shouldn't matter
+//   - design a schema that's order-agnostic
+// TABLE: users
+//   - id, nickname, public key
+// TABLE: accesses
+//   - host/path, userid, date
+// TABLE: services
+//   - userid, serviceid (1:1 map w/ subdomains?? - if not, subservice/role/expiry?)
+//   - could have admin web interface for adjusting roles/expirations/schedules?
+
 import * as http from 'http';
 import {readFile} from 'fs';
 import {parse as parseUrl, Url} from 'url';
 
-import {ConfigFile} from './config.pb';
+import {FrontEnd} from './config.pb';
 
 
 /** Class that ensures async actions occur in series. */
@@ -40,7 +53,7 @@ hello.listen(8000);
 
 
 (async () => {
-  const config = ConfigFile.from(await readFileJson(process.argv[2]));
+  const config = FrontEnd.from(await readFileJson(process.argv[2]));
   // We've read the config file.
   // TODO(sdh): consider adding launch paths into the config
   //   so that this can run all the necessary subprocesses?

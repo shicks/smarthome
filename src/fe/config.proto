@@ -1,7 +1,28 @@
 syntax = "proto3";
 
-message ConfigFile {
-  map<string, uint32> domains = 1;
+message Server {
+  // List of domains that this server should service.
+  repeated string domains = 1;
+  // Command and arguments to launch the server.
+  string command = 2;
+  repeated string args = 3;
+  // A fixed port over which to communicate with the server.
+  // If this is not specified, then `listening_regex` must
+  // have a single capture group to get the port.
+  uint32 fixed_port = 4;
+  // Regex to look for on the child process STDOUT indicating
+  // that the server is accepting connections.  Alternatively
+  // we could poll a /statusz-style page (though we may not
+  // know the port yet).
+  string listening_regex = 5;
+}
+
+message FrontEnd {
+  // List of servers to connect.
+  repeated Server servers = 1;
+  // Main port to listen on.
   uint32 port = 2;
+  // Database -- ??? or should this be in global config?
+  //  - should global config be a parent?!?
   string db = 3;
 }
