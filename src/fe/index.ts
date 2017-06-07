@@ -97,10 +97,11 @@ hello.listen(8000);
     approveDomains,
     domains: ['videos.brieandsteve.com', 'ssh.brieandsteve.com',
               'git.sdhicks.net', 'ssh.sdhicks.net', 'www.sdhicks.net'],
-    server: 'staging',
+    // server: 'staging',
+    server: 'https://acme-v01.api.letsencrypt.org/directory',
   });
 
-  http.createServer(lex.middleware(redirect())).listen(80, function(this: any) {
+  http.createServer(lex.middleware(redirect())).listen(8080, function(this: any) {
     console.log("Listening for ACME http-01 challenges on", this.address());
   })
 
@@ -126,7 +127,7 @@ hello.listen(8000);
     })).pipe(res);
   });
 
-  https.createServer(lex.httpsOptions, lex.middleware(app)).listen(443, function(this: any) {
+  https.createServer(lex.httpsOptions, lex.middleware(app)).listen(4430, function(this: any) {
     console.log("Listening for ACME tls-sni-01 challenges and serve app on", this.address());
   });
 })();
