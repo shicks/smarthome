@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Jobs to run
+jobs=fe
+
+# First make sure we're the correct user
+owner=`ls -ld $0 | awk '{print $3}'`;
+user=`whoami`
+if [ "$user" != "$owner" ]; then
+  exec sudo -c "$0" "$owner"
+fi
+
+mkdir -p /var/log/smarthome
+
+# Now run all the jobs
+out=$(dirname "$0")/../out
+rerun=$out/rerun
+for job in $jobs; do
+  log=/var/log/smarthome/$job
+  nohup node "$rerun" node "$out/$job" > "$log" 2>&1 &
+done

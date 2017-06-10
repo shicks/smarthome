@@ -1,10 +1,14 @@
+const Vinyl = require('vinyl');
 const gulp = require('gulp');
+const path = require('path');
 const sourcemaps = require('gulp-sourcemaps');
+const through = require('through2');
 const ts = require('gulp-typescript');
 const {spawn} = require('child_process');
-const through = require('through2');
-const Vinyl = require('vinyl');
-const path = require('path');
+
+process.env.PATH =
+    path.join(__dirname, 'node_modules', '.bin')
+        + path.delimiter + process.env.PATH;
 
 // TODO - gulp tasks to transform foo.proto to fooproto.js
 //     node_modules/protobufjs/bin/pbjs -t static-module -w commonjs \
@@ -28,8 +32,6 @@ gulp.task('ts', ['copy', 'pb'], () => gulp
             noImplicitAny: true,
             noImplicitThis: true,
             strictNullChecks: true,
-            //inlineSourceMap: true,
-            //inlineSources: true,
             //experimentalDecorators: true,
             //emitDecoratorMetadata: true,
             lib: ['ES2015'],
@@ -40,6 +42,13 @@ gulp.task('ts', ['copy', 'pb'], () => gulp
 gulp.task('default', ['ts'], () => gulp
           .src('build/**/*.js')
           .pipe(gulp.dest('out/')));
+
+gulp.task('install-cron', () => gulp
+          .src('data/autostart')
+          .pipe(crontab()));
+  //.pipe(spawnedProcess('sudo', ['crontab'], x => x + '.out')));
+
+gulp.task('install', ['install-cron']);
           
 
 function pbjs() {
@@ -53,12 +62,17 @@ function pbts() {
       'pbts', ['-'], path => path.replace(/\.pb\.js$/, '.pb.d.ts'));
 }
 
+function crontab() {
+  return through.obj((file, end, cb) => {
+    const job = spawn('sudo', ['crontab']);
+    job.stdin.end(`@reboot ${file.path}\n`);
+    return cb();
+  });
+}
+
 function spawnedProcess(command, args, pathTransform) {
   return through.obj((file, end, cb) => {
     if (file.isNull()) return cb(null, file);
-    const opt = {env: process.env};
-    opt.env.PATH = path.join(__dirname, 'node_modules', '.bin')
-      + path.delimiter + opt.env.PATH;
     const job = spawn(command, args);
     if (file.isBuffer()) {
       job.stdin.end(file.contents);
@@ -74,4 +88,3 @@ function spawnedProcess(command, args, pathTransform) {
     }));
   });
 }
-

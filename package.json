@@ -4,6 +4,7 @@
   "description": "A smart home server designed to run on a Raspberry Pi Zero W and interface with ESP8266 \"smart things\".",
   "bin": {
     "fe": "out/fe/index.js"
+    "rerun": "out/rerun/index.js"
   },
   "scripts": {
     "postinstall": "node_modules/gulp/bin/gulp.js",

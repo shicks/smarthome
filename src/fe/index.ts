@@ -1,5 +1,33 @@
 require('source-map-support').install();
 
+//////////////////
+//
+// Idea: need something to make sure various processes are running
+// Q: do we actually want separate procs, or should we just integrate
+//    everything right here?
+// Some domains will point to external procs, like gogs
+//  - will want to ensure it keeps running
+//  - already need something to ensure whatever main server is running...
+// Consideration:
+//  - all-in-one process is more likely to crash from uncaught exception
+//  - no need to bring everybody down in that case
+//  - in event of a crash, best to log STDERR to crash file and then restart.
+//  - would be nice to do intermediate logging to an in-memory filesystem,
+//    so as not to wear out SSD. i.e. cicular buffer retaining last 20k but
+//    dropping everything else
+//    - can probably do this with node, child_process.spawn, especially w/
+//      guarantees that nothing ever required on stdin
+// Conclusion: make a simple node job that will run another task over and
+// over again, and will dump failures to disk when necessary; could also
+// add a signal handler to dump on-demand.  Also add timestamps?
+//  - Given this, we'll want to pick static ports for everything.
+//  - We could also use a single job to kick everything off?
+//  - Alternatively, write PID and/or port to a /var/run file?
+//    - /var/run/port/foo.bar.com
+//
+//////////////////
+
+
 // TODO - provide common libraries for crypto/auth
 //   Is it a problem for multiple procs to have write access to sqlite3 at once?
 //   - doesn't seem to be - there's transactions if needed, and even just
@@ -95,8 +123,7 @@ hello.listen(8000);
 
   const lex = letsencrypt.create({
     approveDomains,
-    domains: ['videos.brieandsteve.com', 'ssh.brieandsteve.com',
-              'git.sdhicks.net', 'ssh.sdhicks.net', 'www.sdhicks.net'],
+    domains: Object.keys(domains).filter(x => !/localhost/.test(x)),
     // server: 'staging',
     server: 'https://acme-v01.api.letsencrypt.org/directory',
   });
