@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "A smart home server designed to run on a Raspberry Pi Zero W and interface with ESP8266 \"smart things\".",
   "bin": {
-    "fe": "out/fe/index.js"
+    "dns": "out/dns/index.js",
+    "fe": "out/fe/index.js",
     "rerun": "out/rerun/index.js"
   },
   "scripts": {
@@ -37,6 +38,7 @@
     "letsencrypt-express": "^2.0.6",
     "request": "^2.81.0",
     "source-map-support": "^0.4.15",
-    "sqlite3": "^3.1.8"
+    "sqlite3": "^3.1.8",
+    "x2js": "^3.1.1"
   }
 }
