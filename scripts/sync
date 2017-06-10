@@ -1,0 +1,20 @@
+#!/bin/sh
+
+set -ex
+
+# Run this after a full npm install.
+# Example:
+#   scripts/sync pi@ssh.my.domain:src/smarthome/
+# TODO(sdh): consider reading a config file at root of depot for sync location?
+
+cd "$(dirname "$0")"/..
+mkdir deploy
+cp -r data out package.json deploy/
+cd deploy
+
+npm install --only=production
+
+rsync -rlptDuvze ssh * "$@"
+
+cd ..
+rm -rf deploy
