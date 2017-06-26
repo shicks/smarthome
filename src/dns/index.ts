@@ -2,11 +2,11 @@ require('source-map-support').install();
 
 const X2JS = require('x2js');
 const https = require('https');
-const {readFile} = require('fs');
+const {readFile} = require('fs'); // TODO - async.readFile?
 
 import {NameSilo} from './dns.pb';
 
-function* objectEntries<T>(obj: {[key: string]: T}): Array<[string, T]> {
+function* objectEntries<T>(obj: {[key: string]: T}): IterableIterator<[string, T]> {
   for (const key of Object.keys(obj)) {
     yield [key, obj[key]];
   }
@@ -15,27 +15,50 @@ function* objectEntries<T>(obj: {[key: string]: T}): Array<[string, T]> {
 // TODO(sdh): pull this out into a common library
 function readFileJson(filename: string): Promise<object> {
   return new Promise((resolve, reject) => {
-    readFile(filename, (err, data) => err ? reject(err) : resolve(data));
+    readFile(filename, (err: Error|void, data: string|void) =>
+             err ? reject(err) : resolve(data!));
   }).then(JSON.parse);
 }
 
-function apiRequest(api: string, args: {[key: string]: string|number}): any {
+function apiRequest(
+    api: string, args: {[key: string]: string|number}): Promise<any> {
   const query = Object.keys(args).map(key => `${key}=${args[key]}`).join('&');
   const url = `https://www.namesilo.com/api/${api}?${query}`;
   return new Promise((resolve, reject) => {
-    //console.log(`Sending query: ${url}`);
-    https.get(url, (res) => {
-      //console.log('Waiting on data');
-      const chunks = [];
-      res.on('data', (d) => { /*console.log('got chunk');*/ chunks.push(d) })
-        .on('end', () => { /*console.log('got end');*/ resolve(new X2JS().xml2js(chunks.join(''))) });
+    https.get(url, (res: any) => {
+      const chunks: string[] = [];
+      res.on('data', (d: string) => { chunks.push(d); })
+        .on('end', () => { resolve(new X2JS().xml2js(chunks.join(''))); });
     }).on('error', reject).end();
   });
 }
 
 let KEY: string = '';
 
-function dnsListRecords(domain: string): any {
+type Repeated<T> = T|T[];
+
+type DnsListRecordsResponse = {
+  namesilo: {
+    request: {
+      operation: string,
+      ip: string,
+    },
+    reply: {
+      code: number,
+      detail: string,
+      resource_record: Repeated<{
+        record_id: string,
+        type: string,
+        host: string,
+        value: string,
+        ttl: number,
+        distance: number,
+      }>,
+    },      
+  },
+};
+
+function dnsListRecords(domain: string): Promise<DnsListRecordsResponse> {
   return apiRequest('dnsListRecords', {
     version: 1,
     type: 'xml',
@@ -43,9 +66,23 @@ function dnsListRecords(domain: string): any {
     domain});
 }
 
+type DnsUpdateRecordResponse = {
+  namesilo: {
+    request: {
+      operation: string,
+      ip: string,
+    },
+    reply: {
+      code: number,
+      detail: string,
+      record_id?: string,
+    },      
+  },
+};
+
 function dnsUpdateRecord(
     domain: string, rrid: string, rrhost: string,
-    rrvalue: string, rrttl: string): any {
+    rrvalue: string, rrttl: string): Promise<DnsUpdateRecordResponse> {
   return apiRequest('dnsUpdateRecord', {
     version: 1,
     type: 'xml',
@@ -54,10 +91,10 @@ function dnsUpdateRecord(
 }
 
 // NOTE: map is a Map from domains to iterables of subdomains.
-function dynDns(map: {[domain: string]: string[]}) {
+function dynDns(map: {[domain: string]: string[]}): void {
   for (const [domain, subs] of objectEntries(map)) {
     const dynDomains = new Set(subs);
-    const results = [];
+    const results: DnsUpdateRecordResponse[] = [];
     dnsListRecords(domain).then(
       ({namesilo: {request, reply}}) => {
         if (!dynDomains.size) {

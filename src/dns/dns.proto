@@ -1,8 +1,36 @@
 syntax = "proto3";
 
-message NameSilo {
+message DnsConfig {
   // List of domains to update.
   repeated string domains = 1;
   // The NameSilo API key.
   string key = 2;
+}
+
+message DnsListRecordsRequest {
+  string domain = 1;
+}
+message DnsListRecordsReply {
+  repeated ResourceRecord resource_record = 1;
+
+  message ResourceRecord {
+    string resource_id = 1;
+    string type = 2;
+    string host = 3;
+    string value = 4;
+    uint32 ttl = 5;
+    uint32 distance = 6;
+  }
+}
+
+message DnsUpdateRecordRequest {
+  string domain = 1;
+  string rr_id = 2;
+  string rr_host = 3;
+  string rr_value = 4;
+  uint32 rr_distance = 5;
+  uint32 rr_ttl = 6;
+}
+message DnsUpdateRecordReply {
+  string record_id = 1;
 }

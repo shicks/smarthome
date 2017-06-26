@@ -52,7 +52,6 @@ import {parse as parseUrl, Url} from 'url';
 
 import {FrontEnd} from './config.pb';
 
-
 /** Class that ensures async actions occur in series. */
 class Serializer {
   private promise: Promise<any>;
@@ -86,7 +85,7 @@ hello.listen(8000);
 
 
 (async () => {
-  const config = FrontEnd.from(await readFileJson(process.argv[2]));
+  const config = FrontEnd.fromObject(await readFileJson(process.argv[2]));
   // We've read the config file.
   // TODO(sdh): consider adding launch paths into the config
   //   so that this can run all the necessary subprocesses?

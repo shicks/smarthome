@@ -34,8 +34,9 @@ gulp.task('ts', ['copy', 'pb'], () => gulp
             strictNullChecks: true,
             //experimentalDecorators: true,
             //emitDecoratorMetadata: true,
-            lib: ['ES2015'],
-            //target: 'ES2015',
+            //lib: ['ES2015'],
+            target: 'ES2015',
+            module: 'commonjs',
           }))
           .pipe(sourcemaps.write())
           .pipe(gulp.dest('build/')));
