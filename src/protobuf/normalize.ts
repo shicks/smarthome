@@ -26,24 +26,11 @@ interface DescriptorField {
 interface Descriptor {
   fields: {[name: string]: DescriptorField};
   root: DescriptorRoot;
+  values?: {[name: string]: number};
+  valuesById?: {[id: number]: string};
 }
 
 const NUMERIC = /[su]?(?:fixed|int)\d+|float|double/;
-
-// Declared API for protobufs
-
-// function dump(descriptor: Descriptor, prefix: string = ''): void {
-//   for (const name in descriptor.fields) {
-//     const field = descriptor.fields[name];
-//     console.log(`${prefix}${field.repeated ? 'repeated ' : ''}${name}: ${field.type}`);
-//     const sub = descriptor.root.lookup(field.type);
-//     if (sub) {
-//       dump(sub, prefix + '  ');
-//     }
-//   }
-// }
-
-// dump(FrontEnd as any);
 
 export function normalizer<T>(proto: Protobuf<T>): (json: any) => T {
 
@@ -59,6 +46,13 @@ export function normalizer<T>(proto: Protobuf<T>): (json: any) => T {
       if (lc == '0' || lc == 'false') return false;
       if (lc == '1' || lc == 'true') return true;
       throw new Error('Bad boolean vaue: ' + json);
+    } else if (descriptor && descriptor.values && descriptor.valuesById
+               && (typeof json == 'string' || typeof json == 'number')) {
+      // an enum: look up string field or return number
+      if (json in descriptor.valuesById) return Number(json);
+      if (json in descriptor.values) return descriptor.values[json];
+      // TODO(sdh): error?
+      return undefined;
     }
     const out: {[k: string]: any} = {};
     for (const name in json) {
@@ -74,9 +68,10 @@ export function normalizer<T>(proto: Protobuf<T>): (json: any) => T {
       }
       const d = descriptor!.root.lookup(field.type);
       if (value instanceof Array) {
-        out[camel] = value.map(v => normalize(d, field.type, v));
+        out[camel] = value.map(v => normalize(d, field.type, v)).filter(x => x);
       } else {
-        out[camel] = normalize(d, field.type, value);
+        value = normalize(d, field.type, value);
+        if (value != null) out[camel] = value;
       }
     }
     return out;
@@ -89,38 +84,3 @@ export function normalizer<T>(proto: Protobuf<T>): (json: any) => T {
     return proto.fromObject(json);
   }
 }
-
-
-// export public class Xml2Proto<T> {
-//   private ctor: ProtoCtor<T>;
-
-
-//   private fields: {[k: string]: ProtoField};
-
-//   constructor(ctor: ProtoCtor<T>, fields: {[k: string]: ProtoField}) {
-//     this.ctor = ctor;
-//     this.fields = fields;
-//   }
-
-//   public parse(xml: string): T {
-//     const json: any = new X2JS().xml2js(xml);
-//     // now normalize the json
-//     return this.normalize(json, '');
-//   }
-
-//   private normalize(json: any, pos: string): any {
-//     if (this.fields[pos] == 'array') {
-//       if (!(json instanceof Array)) json = [json];
-//       return json.map((elem) => this.normalize(elem, pos + '[]'));
-//     } else if (this.fields[pos] == 'number') {
-//       return Number(json);
-//     }
-//     let out = {};
-//     for (const key in json) {
-//       const prop = camelCase(key);
-//       // TODO(sdh): continue if fields[pos+prop] == 'skip' ?
-//       out[prop] = this.normalize(json[key], (pos ? pos + '.' : '') + prop);
-//     }
-//     return out;
-//   }
-// }
