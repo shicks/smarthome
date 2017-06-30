@@ -1,8 +1,8 @@
 // NameSilo API
 import {HttpClient} from '../async';
-import {parser, Protobuf} from './xml2proto';
-import {Normalizer} from './normalizer';
-import {DnsListRecordsReply, DnsUpdateRecordsReply, IDnsListRecordsRequest, IDnsUpdateRecordRequest} from './dns.pb';
+import {normalizer, Protobuf} from '../protobuf';
+import {DnsListRecordsReply, DnsUpdateRecordReply, IDnsListRecordsRequest, IDnsUpdateRecordRequest} from './dns.pb';
+import {Message} from 'protobufjs/light';
 
 const X2JS: any = require('x2js');
 
@@ -42,10 +42,13 @@ export class NameSilo {
 
   private apiRequest<T>(
       api: string,
-      args: RequestProto | {[k: string]: (string|number)},
+      args: any,
       reply: Protobuf<T>)
   : Promise<Response<T>> {
-    const argsObj = args.toJSON();
+    const normalize = normalizer(reply);
+    // TODO - figure out supertype for message objects
+    const argsObj =
+        args instanceof Message ? args.toJSON() : Object.assign({}, args);
     argsObj['key'] = this.key;
     argsObj['type'] = 'xml';
     argsObj['version'] = 1;
@@ -63,7 +66,7 @@ export class NameSilo {
       return {
         code, detail,
         request: json.request,
-        reply: reply.fromObject(normalizer.normalize(json.reply)),
+        reply: reply.fromObject(normalize(json.reply)),
       };
     });
   }

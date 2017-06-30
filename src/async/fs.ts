@@ -13,3 +13,9 @@ export function stat(path: string): Promise<Stats> {
     fs.stat(path, (err, stats) => err ? reject(err) : resolve(stats));
   });
 }
+
+export function readFile(path: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    fs.readFile(path, (err, data) => err ? reject(err) : resolve(String(data)));
+  });
+}
