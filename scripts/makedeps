@@ -1,0 +1,87 @@
+#!/usr/bin/env node
+
+// Read all *.ts files in src/** and test/** and build up an
+// includeable makefile.  Files are specified in command-line
+// arguments.
+
+const fs = require('fs');
+const path = require('path');
+
+const root = path.resolve(path.dirname(process.argv[1]), '..');
+
+const cache = {};
+  
+function parse(file) {
+  if (file in cache) return cache[file];
+  return cache[file] = new Promise((resolve) => {
+    const actual = file.replace('build/', 'src/').replace('.js', '.ts');
+    fs.readFile(actual, (err, data) => {
+      if (err) {
+        if (err.code == 'ENOENT') {
+          console.error(`\x1b[1;35m${actual}\x1b[m: WARNING - does not exist`);
+        } else {
+          console.error(err);
+        }
+        return resolve([]);
+      }
+      // Look for relative imports, keep in mind where everything
+      // will be running from.
+      const base = path.dirname(file);
+      let match;
+      // NOTE: We only care about relative imports (i.e. start with dot).
+      const re =
+          /^(?:import [^"';]*|export [^"';]*from\s*)['"](\.[^'"]+)['"]/mg;
+      const deps = [];
+      while ((match = re.exec(data))) {
+        let dep = path.relative(root, path.resolve(base, match[1]));
+
+        // Dep is a relative path.  First check if it's a test or pb
+        if (/\.pb$/.test(dep)) {
+          deps.push(Promise.resolve([dep + '.js', dep + '.d.ts']));
+          // The file deps on both the .pb.js and the .pb.d.ts file.
+        } else {
+          // If the dep is a directory, then depend on its index file.
+          deps.push(new Promise((resolve) => {
+            // Check directory in src tree, since build files may not exist
+            const orig = path.resolve(base.replace('build/', 'src/'), match[1]);
+            fs.stat(orig, (err, stats) => {
+              const deps = [];
+              if (stats && stats.isDirectory()) dep = dep + '/index';
+              // NOTE: test files may dep on .ts or built .js files,
+              // in either src or build dirs.
+              const suffix = /^src\//.test(dep) ? '.ts' : '.js';
+              deps.push(dep += suffix);
+              // NOTE: if the dep point to a .ts file, then we need to
+              // recursively add all its deps, too...
+              if (suffix == 'ts') {
+                deps.push(parse(dep));
+              }
+              return resolve(deps);
+            });
+          }));
+        }
+      }
+      return resolve(Promise.all(deps));
+    });
+  });
+}
+
+function mkdeps(file) {
+  const js =
+      path.relative(root, file).replace('src/', 'build/').replace('.ts', '.js');
+  return parse(js).then((deps) => {
+    deps = flatten(deps);
+    return deps.length ? `${js}: ${deps.join(' ')}\n` : '';
+  });
+}
+
+function flatten(xs) {
+  return xs instanceof Array ? [].concat(...xs.map(flatten)) : [xs];
+}
+
+Promise.all(process.argv.slice(2).map(mkdeps)).then((lines) => {
+  console.log(lines.join(''));
+}).catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

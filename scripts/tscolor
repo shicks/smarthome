@@ -1,0 +1,53 @@
+#!/usr/bin/env node
+
+const {execFile} = require('child_process');
+const {readFile} = require('fs');
+
+const [,, cmd, ...args] = process.argv;
+
+const readSnippet = (() => {
+  const cache = new Map();
+  return (file, line, col) => {
+    const promise =
+        file in cache ? cache[file] :
+            cache[file] = new Promise((resolve, reject) => {
+              readFile(file, (err, data) => {
+                if (err) {
+                  reject(err);
+                } else {
+                  resolve(String(data).split('\n'));
+                }
+              });
+            });
+    return promise.then((contents) => {
+      return [
+        '\x1b[1;30m', contents[line - 1], '\n',
+        ' '.repeat(col - 1), '^\x1b[m'].join('');
+    }, (err) => {
+      return `Could not load snippet: ${err}`;
+    });
+  };
+})();
+
+const child = execFile(cmd, args, (err, stdout, stderr) => {
+  console.error(stderr);
+  const lines = [];
+  for (let line of String(stdout).split('\n')) {
+    const match = /^([^ (]+)\((\d+),(\d+)\): (error.*)$/.exec(line);
+    if (match) {
+      const [, file, linenum, col, message] = match;
+      lines.push(Promise.resolve(
+          `\x1b[1;31m${file}(${linenum},${col})\x1b[m: ${message}`));
+      lines.push(readSnippet(file, linenum, col));
+    } else {
+      lines.push(Promise.resolve(line));
+    }
+  }
+  Promise.all(lines).then((out) => {
+    console.log(out.join('\n'));
+    process.exit(err ? err.code || err.signal : 0);
+  }, (err) => {
+    console.error(err);
+    process.exit(1);
+  });
+});
