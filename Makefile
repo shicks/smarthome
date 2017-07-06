@@ -54,7 +54,7 @@ $(build_js_srcs) : build/%.js : build/%.ts
 build/test.mk: $(test_srcs) Makefile
 	mkdir -p "$$(dirname $@)"
 	(tests=''; for a in $(test_srcs); do \
-		test="$${a%.ts}"; \
+		test="$${a%_test.ts}"; \
 	        tests="$$tests $$test"; \
 	        printf "$$test : $$a\n\t\$$(mocha) -r ts-node/register $$a\n"; \
 	done; echo "test :$$tests") > $@

@@ -29,11 +29,10 @@ const readSnippet = (() => {
   };
 })();
 
-const child = execFile(cmd, args, (err, stdout, stderr) => {
-  console.error(stderr);
+function colorize(text) {
   const lines = [];
-  for (let line of String(stdout).split('\n')) {
-    const match = /^([^ (]+)\((\d+),(\d+)\): (error.*)$/.exec(line);
+  for (let line of text.split('\n')) {
+    const match = /^([^ (]+)\s*\((\d+),(\d+)\): (.*)$/.exec(line);
     if (match) {
       const [, file, linenum, col, message] = match;
       lines.push(Promise.resolve(
@@ -43,11 +42,17 @@ const child = execFile(cmd, args, (err, stdout, stderr) => {
       lines.push(Promise.resolve(line));
     }
   }
-  Promise.all(lines).then((out) => {
-    console.log(out.join('\n'));
-    process.exit(err ? err.code || err.signal : 0);
-  }, (err) => {
-    console.error(err);
-    process.exit(1);
-  });
+  return Promise.all(lines).then((out) => out.join('\n'));
+}
+
+const child = execFile(cmd, args, (processErr, stdout, stderr) => {
+  Promise.all([colorize(String(stdout)), colorize(String(stderr))])
+      .then(([out, err]) => {
+        if (err) console.error(err);
+        if (out) console.log(out);
+        process.exit(processErr ? processErr.code || processErr.signal : 0);
+      }, (err) => {
+        console.error(err);
+        process.exit(1);
+      });
 });

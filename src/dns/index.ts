@@ -14,19 +14,19 @@ function* objectEntries<T>(obj: {[key: string]: T}): IterableIterator<[string, T
 function dynDns(ns: NameSilo, map: {[domain: string]: string[]}): void {
   for (const [domain, subs] of objectEntries(map)) {
     const dynDomains = new Set(subs);
-    const results: DnsListRecordsReply.ResourceRecord[] = [];
+    const results: Promise<any>[] = [];
     
     ns.dnsListRecords({domain}).then(
       ({request, reply}) => {
         if (!dynDomains.size) {
           console.log(JSON.stringify(reply, null, 2));
-          return null;
+          return Promise.resolve([]);
         }        
         const myIp = request.ip;
         for (const rec of reply.resourceRecord) {
           //console.log(`CHECKING: ${JSON.stringify(rec, null, 2)}`);
           if (rec.host == domain) continue;
-          let subDomain = rec.host;
+          let subDomain = rec.host!;
           for (;;) {
             const index = subDomain.length - domain.length - 1;
             if (subDomain.substring(index) != '.' + domain) break;
@@ -42,9 +42,9 @@ function dynDns(ns: NameSilo, map: {[domain: string]: string[]}): void {
             const rrHost = subDomain;
             const rrValue = myIp;
             const rrTtl = rec.ttl;
-            console.log(`Updating ${rrhost} to ${rrvalue}`);
+            console.log(`Updating ${rrHost} to ${rrValue}`);
             results.push(
-                ns.dnsUpdateRecord(domain, rrId, rrHost, rrValue, rrTtl));
+                ns.dnsUpdateRecord({domain, rrId, rrHost, rrValue, rrTtl}));
           }
         }
         return Promise.all(results);
@@ -53,7 +53,8 @@ function dynDns(ns: NameSilo, map: {[domain: string]: string[]}): void {
 }
 
 (async () => {
-  const config = DnsConfig.from(JSON.parse(await readFile(process.argv[2])));
+  const config =
+      DnsConfig.fromObject(JSON.parse(await readFile(process.argv[2])));
   const map: {[key: string]: string[]} = {};
   for (const domain of config.domains) {
     const parts = domain.split('.');

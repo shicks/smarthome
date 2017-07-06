@@ -10,6 +10,9 @@ import {Database} from '../out/db';
 //    diskutil eraseVolume HFS+ RAMDisk $device
 //    oncleanup = hdiutil detach $device
 
+//  --- need to get tmp stuff working!
+
+
 const diskFile = tmpname();
 const memFile = tmpname();
 const lockFile = memFile + '.lock';
